@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小黄车调度模拟可视化系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF6B35;
+            --primary-dark: #E85A24;
+            --secondary: #2D3047;
+            --background: #FAFBFC;
+            --surface: #FFFFFF;
+            --text: #2D3047;
+            --text-light: #6B7280;
+            --station-a: #3B82F6;
+            --station-b: #EF4444;
+            --station-c: #10B981;
+            --obstacle: #374151;
+            --grid-line: #E5E7EB;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: var(--background);
+            color: var(--text);
+            height: 100vh;
+            padding: 1.5rem 2rem;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 15% 85%, rgba(255, 107, 53, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 85% 15%, rgba(255, 107, 53, 0.12) 0%, transparent 40%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, transparent 100%);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-align: center;
+            padding: 0.5rem 0;
+            flex-shrink: 0;
+            letter-spacing: -0.02em;
+            text-shadow: 0 2px 10px rgba(255, 107, 53, 0.2);
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            gap: 1.5rem;
+            flex: 1;
+            min-height: 0;
+            max-width: 1800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* PC大屏优化 */
+        @media (min-width: 1400px) {
+            .main-container {
+                grid-template-columns: 300px 1fr 380px;
+                gap: 2rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 1.25rem;
+            }
+            
+            .station-count {
+                font-size: 1.5rem;
+            }
+            
+            .road-info .count {
+                font-size: 1.6rem;
+            }
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow: hidden;
+        }
+        
+        .left-panel .card {
+            flex-shrink: 0;
+        }
+        
+        .left-panel .card:first-child {
+            background: linear-gradient(145deg, var(--surface) 0%, rgba(255, 107, 53, 0.03) 100%);
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.25rem;
+            box-shadow: 0 8px 30px -10px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            backdrop-filter: blur(10px);
+        }
+
+        .card-title {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            padding-bottom: 0.6rem;
+            border-bottom: 2px solid var(--grid-line);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.6rem 0.8rem;
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+            box-shadow: 0 2px 8px rgba(45, 48, 71, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: #1a1d2e;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .speed-control label {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .speed-control select {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--grid-line);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            background: white;
+            transition: border-color 0.2s;
+        }
+
+        .speed-control select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .stations {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .station-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0.8rem;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.04) 100%);
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        .station-row:hover {
+            transform: translateX(4px);
+        }
+
+        .station-name {
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 0.02em;
+        }
+
+        .station-count {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .station-a { color: var(--station-a); }
+        .station-b { color: var(--station-b); }
+        .station-c { color: var(--station-c); }
+
+        .road-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+        }
+
+        .road-info .label {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .road-info .count {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .center-panel {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .map-card {
+            flex: 1;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        #map {
+            flex: 1;
+            border-radius: 12px;
+            display: block;
+            width: 100%;
+            min-height: 0;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        
+        .right-panel .card-title {
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .log-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .log-entries {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+            line-height: 1.6;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 0.5rem;
+        }
+
+        .log-entries::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .log-entries::-webkit-scrollbar-track {
+            background: var(--background);
+            border-radius: 3px;
+        }
+
+        .log-entries::-webkit-scrollbar-thumb {
+            background: var(--grid-line);
+            border-radius: 3px;
+        }
+
+        .log-entries::-webkit-scrollbar-thumb:hover {
+            background: var(--text-light);
+        }
+
+        .log-entry {
+            padding: 0.4rem 0;
+            border-bottom: 1px solid var(--grid-line);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--text-light);
+            margin-right: 0.5rem;
+            font-weight: 600;
+        }
+
+        .log-truck {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        /* 响应式 - 平板 */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 240px 1fr 280px;
+                gap: 1.25rem;
+            }
+            
+            h1 {
+                font-size: 1.6rem;
+            }
+        }
+
+        @media (max-width: 1000px) {
+            .main-container {
+                grid-template-columns: 200px 1fr 240px;
+                gap: 1rem;
+            }
+            
+            .card {
+                padding: 1rem;
+            }
+        }
+
+        /* 移动端 - 允许滚动 */
+        @media (max-width: 900px) {
+            html, body {
+                overflow: auto;
+                height: auto;
+            }
+
+            body {
+                height: auto;
+                min-height: 100vh;
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.4rem;
+                margin-bottom: 1rem;
+            }
+
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+                height: auto;
+                min-height: auto;
+                gap: 1rem;
+            }
+
+            .left-panel {
+                flex-direction: row;
+                flex-wrap: wrap;
+                overflow: visible;
+            }
+
+            .left-panel .card {
+                flex: 1;
+                min-width: 200px;
+            }
+
+            .center-panel {
+                min-height: 400px;
+            }
+
+            .right-panel {
+                min-height: 200px;
+            }
+            
+            .log-card {
+                max-height: 300px;
+            }
+        }
+
+        /* 响应式 - 手机 */
+        @media (max-width: 500px) {
+            body {
+                padding: 0.75rem;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .card {
+                padding: 0.875rem;
+                border-radius: 12px;
+            }
+
+            .left-panel .card {
+                min-width: 100%;
+            }
+
+            .btn {
+                padding: 0.5rem 0.6rem;
+                font-size: 0.8rem;
+            }
+
+            .station-count {
+                font-size: 1.1rem;
+            }
+
+            .center-panel {
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🚲 小黄车调度模拟可视化系统</h1>
+    
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="card">
+                <div class="card-title">🎮 控制面板</div>
+                <div class="controls">
+                    <div class="btn-row">
+                        <button id="startBtn" class="btn btn-primary">▶ 开始</button>
+                        <button id="pauseBtn" class="btn btn-secondary" disabled>⏸ 暂停</button>
+                        <button id="resetBtn" class="btn btn-secondary">↺ 重置</button>
+                    </div>
+                    <div class="speed-control">
+                        <label>速度:</label>
+                        <select id="speed">
+                            <option value="1">1x</option>
+                            <option value="2">2x</option>
+                            <option value="4">4x</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🚏 站点车辆</div>
+                <div class="stations">
+                    <div class="station-row">
+                        <span class="station-name station-a">A站</span>
+                        <span class="station-count station-a" id="countA">30</span>
+                    </div>
+                    <div class="station-row">
+                        <span class="station-name station-b">B站</span>
+                        <span class="station-count station-b" id="countB">40</span>
+                    </div>
+                    <div class="station-row">
+                        <span class="station-name station-c">C站</span>
+                        <span class="station-count station-c" id="countC">30</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="road-info">
+                    <span class="label">🚴 路上车辆:</span>
+                    <span class="count" id="roadCount">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="center-panel card map-card">
+            <canvas id="map"></canvas>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--station-a);"></div>
+                    <span>A站</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--station-b);"></div>
+                    <span>B站</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--station-c);"></div>
+                    <span>C站</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--obstacle);"></div>
+                    <span>障碍物</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--primary);"></div>
+                    <span>货车</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #9333EA; border-radius: 50%;"></div>
+                    <span>乘客</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel card log-card">
+            <div class="card-title">📊 模拟状态日志</div>
+            <div class="log-entries" id="logEntries">
+                <div class="log-entry">
+                    <span class="log-time">00:00</span> 
+                    系统就绪，等待开始...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const OBSTACLE_MAP = [
+            [0, 0, 0, 0, 1, 1, 1, 1],
+            [0, 1, 1, 0, 1, 1, 1, 1],
+            [0, 1, 1, 0, 0, 0, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0],
+            [1, 1, 1, 1, 1, 0, 1, 0],
+            [1, 1, 1, 1, 1, 0, 0, 0],
+            [1, 1, 1, 1, 1, 1, 1, 0],
+        ];
+
+        const ROWS = 8, COLS = 8;
+
+        const STATIONS_CONFIG = [
+            { name: 'A', row: 0, col: 0, bikes: 30, color: '#3B82F6' },
+            { name: 'B', row: 7, col: 7, bikes: 40, color: '#EF4444' },
+            { name: 'C', row: 2, col: 3, bikes: 30, color: '#10B981' },
+        ];
+
+        const TRUCKS_CONFIG = [
+            { id: 1, capacity: 20, speed: 3 },
+            { id: 2, capacity: 20, speed: 3 },
+        ];
+
+        const canvas = document.getElementById('map');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const speedSelect = document.getElementById('speed');
+        const logEntries = document.getElementById('logEntries');
+        const countA = document.getElementById('countA');
+        const countB = document.getElementById('countB');
+        const countC = document.getElementById('countC');
+        const roadCount = document.getElementById('roadCount');
+
+        function bfsPath(startRow, startCol, endRow, endCol) {
+            if (startRow === endRow && startCol === endCol) {
+                return [{ row: startRow, col: startCol }];
+            }
+            const visited = new Set();
+            visited.add(`${startRow},${startCol}`);
+            const queue = [[{ row: startRow, col: startCol }]];
+            const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+            while (queue.length > 0) {
+                const path = queue.shift();
+                const cur = path[path.length - 1];
+                for (const [dr, dc] of dirs) {
+                    const nr = cur.row + dr, nc = cur.col + dc;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && !visited.has(`${nr},${nc}`) && OBSTACLE_MAP[nr][nc] === 0) {
+                        const newPath = [...path, { row: nr, col: nc }];
+                        if (nr === endRow && nc === endCol) return newPath;
+                        visited.add(`${nr},${nc}`);
+                        queue.push(newPath);
+                    }
+                }
+            }
+            return null;
+        }
+
+        class Station {
+            constructor(name, row, col, bikes, color) {
+                this.name = name; this.row = row; this.col = col; this.bikes = bikes; this.color = color;
+            }
+        }
+
+        class Passenger {
+            constructor(start, end) {
+                this.start = start; this.end = end;
+                this.path = bfsPath(start.row, start.col, end.row, end.col);
+                this.pathIndex = 0; this.progress = 0; this.speed = 1;
+                this.color = `hsl(${Math.random() * 360}, 70%, 55%)`;
+            }
+            move() {
+                if (!this.path || this.pathIndex >= this.path.length - 1) return true;
+                this.progress += this.speed;
+                while (this.progress >= 1 && this.pathIndex < this.path.length - 1) {
+                    this.progress--; this.pathIndex++;
+                }
+                return this.pathIndex >= this.path.length - 1;
+            }
+            getPos() {
+                if (!this.path || this.path.length === 0) return { row: this.start.row, col: this.start.col };
+                if (this.pathIndex >= this.path.length - 1) return this.path[this.path.length - 1];
+                const c = this.path[this.pathIndex], n = this.path[this.pathIndex + 1];
+                return { row: c.row + (n.row - c.row) * this.progress, col: c.col + (n.col - c.col) * this.progress };
+            }
+        }
+
+        class Truck {
+            constructor(id, capacity, speed) {
+                this.id = id; this.capacity = capacity; this.speed = speed;
+                this.loaded = 0; this.currentStation = null; this.targetStation = null;
+                this.fromStation = null; this.path = null; this.pathIndex = 0; this.progress = 0;
+            }
+            move() {
+                if (!this.path || this.pathIndex >= this.path.length - 1) return true;
+                this.progress += this.speed;
+                while (this.progress >= 1 && this.pathIndex < this.path.length - 1) {
+                    this.progress--; this.pathIndex++;
+                }
+                return this.pathIndex >= this.path.length - 1;
+            }
+            getPos() {
+                if (this.currentStation) return { row: this.currentStation.row, col: this.currentStation.col };
+                if (!this.path || this.path.length === 0) return { row: 0, col: 0 };
+                if (this.pathIndex >= this.path.length - 1) return this.path[this.path.length - 1];
+                const c = this.path[this.pathIndex], n = this.path[this.pathIndex + 1];
+                return { row: c.row + (n.row - c.row) * this.progress, col: c.col + (n.col - c.col) * this.progress };
+            }
+        }
+
+        class Simulation {
+            constructor() {
+                this.time = 0; this.stations = []; this.trucks = []; this.passengers = [];
+                this.isRunning = false; this.speed = 1; this.tickInterval = null;
+                this.animationFrame = null; this.cellSize = 50; this.init();
+            }
+
+            init() {
+                this.resizeCanvas();
+                this.stations = STATIONS_CONFIG.map(cfg => new Station(cfg.name, cfg.row, cfg.col, cfg.bikes, cfg.color));
+                this.trucks = TRUCKS_CONFIG.map(cfg => {
+                    const t = new Truck(cfg.id, cfg.capacity, cfg.speed);
+                    t.currentStation = this.stations[0]; return t;
+                });
+                this.updateUI(); this.render();
+            }
+
+            resizeCanvas() {
+                const container = canvas.parentElement;
+                const rect = container.getBoundingClientRect();
+                const availableWidth = rect.width - 32;
+                const availableHeight = rect.height - 60;
+                const size = Math.min(availableWidth, availableHeight);
+                canvas.width = size;
+                canvas.height = size;
+                this.cellSize = size / ROWS;
+            }
+
+            formatTime(s) {
+                const m = Math.floor(s / 60), sec = s % 60;
+                return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            }
+
+            addLog(msg) {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerHTML = `<span class="log-time">${this.formatTime(this.time)}</span> ${msg}`;
+                logEntries.insertBefore(entry, logEntries.firstChild);
+                while (logEntries.children.length > 60) logEntries.removeChild(logEntries.lastChild);
+            }
+
+            chooseDest(t) {
+                const avail = this.stations.filter(s => s !== t.currentStation);
+                if (avail.length === 0) return null;
+                if (t.loaded > 0) {
+                    const sorted = [...avail].sort((a, b) => a.bikes - b.bikes);
+                    return sorted[Math.floor(Math.random() * Math.min(2, sorted.length))];
+                } else {
+                    const sorted = [...avail].sort((a, b) => b.bikes - a.bikes);
+                    return sorted[Math.floor(Math.random() * Math.min(2, sorted.length))];
+                }
+            }
+
+            spawnPassenger() {
+                const start = this.stations[Math.floor(Math.random() * this.stations.length)];
+                const others = this.stations.filter(s => s !== start);
+                const end = others[Math.floor(Math.random() * others.length)];
+                if (start.bikes > 0) {
+                    start.bikes--;
+                    const p = new Passenger(start, end);
+                    if (p.path) this.passengers.push(p);
+                }
+            }
+
+            movePassengers() {
+                const arrived = [];
+                for (const p of this.passengers) {
+                    if (p.move()) { p.end.bikes++; arrived.push(p); }
+                }
+                for (const p of arrived) {
+                    const idx = this.passengers.indexOf(p);
+                    if (idx > -1) this.passengers.splice(idx, 1);
+                }
+            }
+
+            moveTrucks() {
+                const msgs = [];
+                for (const t of this.trucks) {
+                    if (t.currentStation && !t.targetStation) {
+                        while (t.loaded < t.capacity && t.currentStation.bikes > 0) {
+                            t.currentStation.bikes--; t.loaded++;
+                        }
+                        const target = this.chooseDest(t);
+                        if (target && target !== t.currentStation) {
+                            const path = bfsPath(t.currentStation.row, t.currentStation.col, target.row, target.col);
+                            if (path) {
+                                t.fromStation = t.currentStation; t.path = path;
+                                t.pathIndex = 0; t.progress = 0; t.targetStation = target; t.currentStation = null;
+                                if (t.loaded > 0) msgs.push(`${t.fromStation.name}→${t.targetStation.name}运输${t.loaded}辆车`);
+                            }
+                        }
+                    } else if (t.targetStation && t.move()) {
+                        t.currentStation = t.targetStation;
+                        if (t.loaded > 0) { t.currentStation.bikes += t.loaded; t.loaded = 0; }
+                        t.targetStation = null; t.path = null;
+                    }
+                }
+                return msgs;
+            }
+
+            updateUI() {
+                countA.textContent = this.stations[0].bikes;
+                countB.textContent = this.stations[1].bikes;
+                countC.textContent = this.stations[2].bikes;
+                roadCount.textContent = this.passengers.length + this.trucks.reduce((s, t) => s + t.loaded, 0);
+            }
+
+            render() {
+                const cs = this.cellSize;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const px = c * cs, py = r * cs;
+                        ctx.fillStyle = OBSTACLE_MAP[r][c] === 1 ? '#374151' : '#F3F4F6';
+                        ctx.fillRect(px, py, cs, cs);
+                        ctx.strokeStyle = '#E5E7EB'; ctx.lineWidth = 1;
+                        ctx.strokeRect(px, py, cs, cs);
+                    }
+                }
+                for (const s of this.stations) {
+                    const px = s.col * cs + cs / 2, py = s.row * cs + cs / 2;
+                    const grad = ctx.createRadialGradient(px, py, 0, px, py, cs / 2.5);
+                    grad.addColorStop(0, s.color + '50'); grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(px, py, cs / 2.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(px, py, cs / 4.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = 'white'; ctx.font = `bold ${cs / 5}px sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s.name, px, py);
+                    ctx.fillStyle = s.color; ctx.font = `bold ${cs / 6.5}px monospace`;
+                    ctx.fillText(s.bikes, px, py + cs / 2.8);
+                }
+                for (const p of this.passengers) {
+                    const pos = p.getPos();
+                    const px = pos.col * cs + cs / 2, py = pos.row * cs + cs / 2;
+                    ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(px, py, cs / 11, 0, Math.PI * 2); ctx.fill();
+                }
+                for (const t of this.trucks) {
+                    const pos = t.getPos();
+                    const px = pos.col * cs + cs / 2, py = pos.row * cs + cs / 2;
+                    ctx.fillStyle = '#FF6B35'; ctx.beginPath();
+                    ctx.roundRect(px - cs / 5.5, py - cs / 5.5, cs / 2.75, cs / 2.75, 4); ctx.fill();
+                    ctx.fillStyle = 'white'; ctx.font = `bold ${cs / 8}px monospace`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t.id, px, py);
+                    if (t.loaded > 0) {
+                        ctx.fillStyle = '#FF6B35'; ctx.font = `bold ${cs / 10}px monospace`;
+                        ctx.fillText(t.loaded, px, py + cs / 4);
+                    }
+                }
+            }
+
+            tick() {
+                this.time++; this.spawnPassenger(); this.movePassengers();
+                const msgs = this.moveTrucks(); this.updateUI();
+                this.addLog(`A站车${this.stations[0].bikes}，B站车${this.stations[1].bikes}，C站车${this.stations[2].bikes}，路上车${this.passengers.length + this.trucks.reduce((s, t) => s + t.loaded, 0)}`);
+                for (const m of msgs) this.addLog(`<span class="log-truck">🚚 ${m}</span>`);
+            }
+
+            start() {
+                if (this.isRunning) return;
+                this.isRunning = true; startBtn.disabled = true; pauseBtn.disabled = false;
+                const tick = () => { if (!this.isRunning) return; this.tick(); this.tickInterval = setTimeout(tick, 1000 / this.speed); };
+                tick();
+                const animate = () => { this.render(); if (this.isRunning) this.animationFrame = requestAnimationFrame(animate); };
+                animate();
+            }
+
+            pause() {
+                this.isRunning = false; startBtn.disabled = false; pauseBtn.disabled = true;
+                clearTimeout(this.tickInterval); cancelAnimationFrame(this.animationFrame);
+            }
+
+            reset() {
+                this.pause(); this.time = 0; this.passengers = []; this.resizeCanvas(); this.init();
+                logEntries.innerHTML = '<div class="log-entry"><span class="log-time">00:00</span> 系统已重置，准备就绪...</div>';
+            }
+
+            setSpeed(v) { this.speed = parseInt(v); if (this.isRunning) { this.pause(); this.start(); } }
+        }
+
+        const sim = new Simulation();
+        window.addEventListener('resize', () => { sim.resizeCanvas(); sim.render(); });
+        startBtn.addEventListener('click', () => sim.start());
+        pauseBtn.addEventListener('click', () => sim.pause());
+        resetBtn.addEventListener('click', () => sim.reset());
+        speedSelect.addEventListener('change', e => sim.setSpeed(e.target.value));
+    </script>
+</body>
+</html>
